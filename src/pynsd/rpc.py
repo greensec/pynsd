@@ -128,9 +128,12 @@ class Server(object):
             return
         os.remove(zffull)
 
-    def zoneStatus(self, name):
-        name = self._filterZoneName(name)
-        res = self.cc.call('zonestatus', [name])
+    def _call(self, cmd, name, *args):
+        if name is not None:
+            name = self._filterZoneName(name)
+            call_args = [name]
+        call_args += args
+        res = self.cc.call(cmd, call_args)
         if ('error ' in res):
             return ErrorResult(2400, 'Command failed',
                                nsdresult=res).dict()
@@ -147,14 +150,36 @@ class Server(object):
         return Result(1000, 'Command completed successfully',
                       nsdresult=res).dict()
 
+    def zoneStatus(self, name):
+        return self._call('zonestatus', name)
+
     def reloadZone(self, name):
-        name = self._filterZoneName(name)
-        res = self.cc.call('reload', [name])
+        return self._call('reload', name)
+
+    def notifyZone(self, name):
+        return self._call('notify', name)
+
+    def transferZone(self, name):
+        return self._call('transfer', name)
+
+    def reconfig(self):
+        return self._call('reconfig', None)
+
+    def stats(self, noreset=True):
+        cmd = 'stats'
+        if noreset:
+            cmd = 'stats_noreset'
+        res = self.cc.call(cmd)
         if ('error ' in res):
             return ErrorResult(2400, 'Command failed',
                                nsdresult=res).dict()
+        stats = {}
+        for line in res.split("\n"):
+            (ky, vl) = line.split('=', 2)
+            stats[ky] = vl
+
         return Result(1000, 'Command completed successfully',
-                      nsdresult=res).dict()
+                      stats=stats).dict()
 
 
 class Daemon(zerorpc.Server):

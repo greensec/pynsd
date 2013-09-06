@@ -70,9 +70,11 @@ class ControlClient(object):
 
     def fetch(self):
         buf = ''
+        buf_len = 0
+
         while True:
             try:
-                buf = self.sock.read(self._bufsize)
+                part = self.sock.read(self._bufsize - buf_len)
             except socket.sslerror, err:
                 if (err[0] == socket.SSL_ERROR_WANT_READ or
                     err[0] == socket.SSL_ERROR_WANT_WRITE):
@@ -88,8 +90,11 @@ class ControlClient(object):
                     # XXX socket was closed?
                     break
                 raise
-            else:
+            if len(part) == 0:
                 break
+            buf += part
+            buf_len += len(part)
+
         self.close()
         if self.strip:
             return buf.strip()

@@ -28,7 +28,7 @@ print clt.call('delzone', ['testzone.example.', 'cust'])
 ```
 
 It is also possible to use the magic method __getattr__ to call a method directly:
-```
+```python
 print clt.zonestatus('testzone.example.')
 ```
 
@@ -46,6 +46,17 @@ Send requests to rpc daemon:
 ```bash
 zerorpc tcp://127.0.0.1:5912 zoneStatus testzone.example.
 ```
+
+#### Available Commands
+* addZone(name, zonedata, pattern = None)
+* updateZone(name, zonedata)
+* delZone(name)
+* zoneStatus(name)
+* reloadZone(name)
+* notifyZone(name)
+* transferZone(name)
+* reconfig
+* stats(noreset = True)
 
 Installation
 ------------
