@@ -27,6 +27,11 @@ print clt.call('addzone', ['testzone.example.', 'cust'])
 print clt.call('delzone', ['testzone.example.', 'cust'])
 ```
 
+It is also possible to use the magic method __getattr__ to call a method directly:
+```
+print clt.zonestatus('testzone.example.')
+```
+
 Usage of RPC Daemon
 -------------------
 To use the rpc daemon you have to change the sample config /etc/[pynsd-rpcd.cfg](https://raw.github.com/novutec/pynsd/master/src/etc/pynsd-rpcd.cfg) to your settings

@@ -48,6 +48,11 @@ class ControlClient(object):
                                     keyfile=self.clientKey)
         self.sock.connect((host, port))
 
+    def __getattr__(self, name):
+        def fn(*args):
+            return self.call(name, args)
+        return fn
+
     def call(self, cmd, args=()):
         if self.sock is None:
             self.connect(self.host, self.port)
