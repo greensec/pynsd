@@ -28,14 +28,14 @@ print clt.call('delzone', ['testzone.example.', 'cust'])
 
 Usage of RPC Daemon
 -------------------
-To use the rpc daemon you have to change the sample config [pynsd-rpcd.cfg](https://raw.github.com/novutec/pynsd/src/etc/pynsd-rpcd.cfg) to your settings
-and start server.
+To use the rpc daemon you have to change the sample config /etc/[pynsd-rpcd.cfg](https://raw.github.com/novutec/pynsd/master/src/etc/pynsd-rpcd.cfg) to your settings
+and start daemon.
  
 ```bash
 pynsd-rpcd -c /etc/pynsd-rpcd.cfg
 ```
 
-and control rpc daemon
+Send requests to rpc daemon:
 
 ```bash
 zerorpc tcp://127.0.0.1:5912 zoneStatus testzone.example.
@@ -59,5 +59,5 @@ pip install -e git+git@github.com:novutec/pynsd.git
 #### Requirements
 
 * Python 2.7 / 3.2 / 3.3
-* zerorpc (for rpc daemon)
+* [zerorpc](https://github.com/dotcloud/zerorpc-python) (for rpc daemon)
 * argparse (to set config file in rpc daemon)
