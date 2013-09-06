@@ -1,13 +1,14 @@
 pynsd
 =====
 
-pynsd is a library to use new control port of NSD 4 in python.
+pynsd is a library to use new control api of NSD 4 in python.
 
 See: http://www.nlnetlabs.nl/svn/nsd/trunk/doc/NSD-4-features
 
-Additional an [zerorpc](https://github.com/dotcloud/zerorpc-python) based RPC Daemon to create, update and delete zones on NSD Master.
+Additional a [zerorpc](https://github.com/dotcloud/zerorpc-python) based RPC Daemon to create, update and delete zones on NSD master.
 
-Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com) Licensed under the Apache License, Version 2.0 (the "License").
+Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+Licensed under the Apache License, Version 2.0 (the "License").
 
 Basic Example of Usage
 ------------------------
