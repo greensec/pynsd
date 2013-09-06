@@ -5,6 +5,8 @@ pynsd is a library to use new control api of NSD 4 in python.
 
 See: http://www.nlnetlabs.nl/svn/nsd/trunk/doc/NSD-4-features
 
+Additional RPC Daemon: [pynsd-rpcd](https://github.com/novutec/pynsd-rpcd)
+
 Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
 
 Licensed under the Apache License, Version 2.0 (the "License").
