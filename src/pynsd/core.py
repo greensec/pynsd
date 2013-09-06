@@ -1,13 +1,28 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
+"""
+Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@category Novutec
+@package pynsd
+@copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+@license http://www.apache.org/licenses/LICENSE-2.0
+"""
 
 import ssl
 import socket
 import errno
-
-__title__ = "pynsd"
-__version__ = "0.0.1"
-__author__ = "novutec Inc."
-__license__ = "Apache2"
 
 
 class ControlClient(object):
@@ -41,7 +56,8 @@ class ControlClient(object):
 
     def connect(self, host, port=8952):
         if self.sock is not None:
-            raise Exception('Socket already defined.')
+            self.close()
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock = ssl.wrap_socket(s,
                                     certfile=self.clientCert,
@@ -53,28 +69,32 @@ class ControlClient(object):
             return self.call(name, args)
         return fn
 
-    def call(self, cmd, args=()):
-        if self.sock is None:
-            self.connect(self.host, self.port)
-        # send header
-        self.sock.sendall("NSDCT%d " % (self.NSD_CONTROL_VERSION))
-        # send command name
-        self.sock.sendall(' ' + cmd)
-        # send command parameters
-        for arg in args:
-            self.sock.sendall(' ' + arg)
-        # send break line to commit command as completed
-        self.sock.sendall("\n")
-        # fetch response
-        return self.fetch()
+    def __send(self, data):
+        try:
+            self.sock.sendall(data)
+        except socket.timeout:
+            self.close()
+            raise
 
-    def fetch(self):
+        except socket.sslerror:
+            self.close()
+            raise
+
+        except socket.error:
+            self.close()
+            raise
+
+    def __fetch(self):
         buf = ''
         buf_len = 0
 
         while True:
             try:
                 part = self.sock.read(self._bufsize - buf_len)
+            except socket.timeout:
+                self.close()
+                raise
+
             except socket.sslerror, err:
                 if (err[0] == socket.SSL_ERROR_WANT_READ or
                     err[0] == socket.SSL_ERROR_WANT_WRITE):
@@ -82,14 +102,18 @@ class ControlClient(object):
                 if (err[0] == socket.SSL_ERROR_ZERO_RETURN or
                     err[0] == socket.SSL_ERROR_EOF):
                     break
+                self.close()
                 raise
+
             except socket.error, err:
                 if err[0] == errno.EINTR:
                     continue
                 if err[0] == errno.EBADF:
                     # XXX socket was closed?
                     break
+                self.close()
                 raise
+
             if len(part) == 0:
                 break
             buf += part
@@ -99,3 +123,23 @@ class ControlClient(object):
         if self.strip:
             return buf.strip()
         return buf
+
+    def call(self, cmd, args=()):
+        if self.sock is None:
+            self.connect(self.host, self.port)
+
+        # send header
+        self.__send("NSDCT%d " % (self.NSD_CONTROL_VERSION))
+
+        # send command name
+        self.__send(' ' + cmd)
+
+        # send command parameters
+        for arg in args:
+            self.__send(' ' + arg)
+
+        # send break line to commit command as completed
+        self.__send("\n")
+
+        # fetch response
+        return self.__fetch()

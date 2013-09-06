@@ -20,7 +20,4 @@ limitations under the License.
 @license http://www.apache.org/licenses/LICENSE-2.0
 """
 
-from pynsd.core import (
-    ControlClient,
-    __version__
-)
+from pynsd.core import ControlClient
