@@ -73,7 +73,8 @@ class Server(object):
         if res != 'ok':
             return ErrorResult(2302, 'Object exists', nsdresult=res).dict()
 
-        self._writeZoneFile(name, zonedata)
+        if zonedata is not None and zonedata != '':
+            self._writeZoneFile(name, zonedata)
         return self.reloadZone(name)
 
     def _filterZoneName(self, name):
