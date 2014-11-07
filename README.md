@@ -26,7 +26,7 @@ clt = pynsd.ControlClient(clientCert='/etc/nsd/nsd_control.pem',
                           port=8952)
 print clt.call('status')
 print clt.call('addzone', ['testzone.example.', 'cust'])
-print clt.call('delzone', ['testzone.example.', 'cust'])
+print clt.call('delzone', ['testzone.example.'])
 ```
 
 It is also possible to use the magic method __getattr__ to call a method directly:
