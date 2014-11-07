@@ -7,8 +7,8 @@ See: http://www.nlnetlabs.nl/svn/nsd/trunk/doc/NSD-4-features
 
 Additional RPC Daemon: [pynsd-rpcd](https://github.com/greensec/pynsd-rpcd)
 
-Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
-Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
+ * Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+ * Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 
 Licensed under the Apache License, Version 2.0 (the "License").
 
