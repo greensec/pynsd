@@ -1,6 +1,7 @@
 # coding: utf-8
 """
 Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@ limitations under the License.
 @category Novutec
 @package pynsd-rpcd
 @copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+@copyright Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 @license http://www.apache.org/licenses/LICENSE-2.0
 """
 
@@ -28,9 +30,9 @@ PROJECT_NAME = 'pynsd'
 install_requires = []
 
 setup(name='%s' % PROJECT_NAME,
-      url='https://github.com/novutec/%s' % PROJECT_NAME,
-      author="novutec Inc.",
-      author_email='dev@novutec.com',
+      url='https://github.com/greensec/%s' % PROJECT_NAME,
+      author="greenSec Solutions",
+      author_email='meinecke@greensec.de',
       keywords='nsd api',
       description="Library to connect and call command against new NSD >=4 control api.",
       license='Apache2',
