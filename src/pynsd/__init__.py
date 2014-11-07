@@ -1,6 +1,7 @@
 # coding: utf-8
 """
 Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +18,8 @@ limitations under the License.
 @category Novutec
 @package pynsd
 @copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+@copyright Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 @license http://www.apache.org/licenses/LICENSE-2.0
 """
 
-from pynsd.core import ControlClient
+from .core import *

@@ -1,6 +1,7 @@
 # coding: utf-8
 """
 Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,22 +18,23 @@ limitations under the License.
 @category Novutec
 @package pynsd
 @copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
+@copyright Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
 @license http://www.apache.org/licenses/LICENSE-2.0
 """
-
 import ssl
 import socket
 import errno
+from .parser import *
 
-
+""" client class to connect to nsd control port and send calls
+"""
 class ControlClient(object):
-    """Client class to connect to nsd control port and send calls"""
 
     NSD_CONTROL_VERSION = 1
     BUFSIZE = 8192
 
     def __init__(self, clientCert, clientKey, host='127.0.0.1',
-                 port=8952, bufsize=None, strip=False):
+                 port=8952, bufsize=None, strip=False, parse=True):
         self.clientCert = clientCert
         self.clientKey = clientKey
         self._bufsize = bufsize or self.__class__.BUFSIZE
@@ -40,20 +42,29 @@ class ControlClient(object):
         self.port = port
         self.sock = None
         self.strip = strip
+        self.parse = parse
 
+    """ deconstructor - auto close connection
+    """
     def __del__(self):
         self.close()
 
+    """ Set client certificate
+    """
     def setClientCert(self, clientCert, clientKey):
         self.clientCert = clientCert
         self.clientKey = clientKey
 
+    """ close connection if still open
+    """
     def close(self):
         if self.sock is not None:
             self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
             self.sock = None
 
+    """ connect to "remote" host
+    """
     def connect(self, host, port=8952):
         if self.sock is not None:
             self.close()
@@ -64,11 +75,15 @@ class ControlClient(object):
                                     keyfile=self.clientKey)
         self.sock.connect((host, port))
 
+    """ wrapper to make commands generic callable
+    """
     def __getattr__(self, name):
         def fn(*args):
             return self.call(name, args)
         return fn
 
+    """ send call to api
+    """
     def __send(self, data):
         try:
             self.sock.sendall(data)
@@ -84,6 +99,8 @@ class ControlClient(object):
             self.close()
             raise
 
+    """ fetch result of previous call
+    """
     def __fetch(self):
         buf = ''
         buf_len = 0
@@ -109,7 +126,8 @@ class ControlClient(object):
                 if err[0] == errno.EINTR:
                     continue
                 if err[0] == errno.EBADF:
-                    # XXX socket was closed?
+                    """XXX socket was closed?
+                    """
                     break
                 self.close()
                 raise
@@ -124,22 +142,32 @@ class ControlClient(object):
             return buf.strip()
         return buf
 
+    """ run a command and return result
+    """
     def call(self, cmd, args=()):
         if self.sock is None:
             self.connect(self.host, self.port)
 
-        # send header
+        """send header
+        """
         self.__send("NSDCT%d " % (self.NSD_CONTROL_VERSION))
 
-        # send command name
+        """send command name
+        """
         self.__send(' ' + cmd)
 
-        # send command parameters
+        """send command parameters
+        """
         for arg in args:
             self.__send(' ' + arg)
 
-        # send break line to commit command as completed
+        """send break line to commit command as completed
+        """
         self.__send("\n")
 
-        # fetch response
+        """fetch response
+        """
+        if self.parse:
+            return ControlResultParser.parse(cmd, self.__fetch())
+
         return self.__fetch()
