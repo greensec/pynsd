@@ -1,7 +1,7 @@
 # coding: utf-8
 """
 Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
-Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
+Copyright (c) 2014 - 2021 greenSec GmbH (https://www.greensec.de)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,10 +15,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-@category Novutec
 @package pynsd
 @copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
-@copyright Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
+@copyright Copyright (c) 2014 - 2021 greenSec GmbH (https://www.greensec.de)
 @license http://www.apache.org/licenses/LICENSE-2.0
 """
 import ssl
@@ -33,10 +32,10 @@ class ControlClient(object):
     NSD_CONTROL_VERSION = 1
     BUFSIZE = 8192
 
-    def __init__(self, clientCert, clientKey, host='127.0.0.1',
+    def __init__(self, clientCert=None, clientKey=None, host='127.0.0.1',
                  port=8952, bufsize=None, strip=False, parse=True):
-        self.clientCert = clientCert
-        self.clientKey = clientKey
+        if clientCert:
+            self.setClientCert(clientCert, clientKey)
         self._bufsize = bufsize or self.__class__.BUFSIZE
         self.host = host
         self.port = port
@@ -58,21 +57,20 @@ class ControlClient(object):
     """ close connection if still open
     """
     def close(self):
-        if self.sock is not None:
-            self.sock.shutdown(socket.SHUT_RDWR)
-            self.sock.close()
-            self.sock = None
+        if self.sock is None:
+            return
+
+        self.sock.shutdown(socket.SHUT_RDWR)
+        self.sock.close()
+        self.sock = None
 
     """ connect to "remote" host
     """
     def connect(self, host, port=8952):
-        if self.sock is not None:
-            self.close()
+        self.close()
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock = ssl.wrap_socket(s,
-                                    certfile=self.clientCert,
-                                    keyfile=self.clientKey)
+        self.sock = ssl.wrap_socket(s, certfile=self.clientCert, keyfile=self.clientKey)
         self.sock.connect((host, port))
 
     """ wrapper to make commands generic callable
@@ -86,12 +84,12 @@ class ControlClient(object):
     """
     def __send(self, data):
         try:
-            self.sock.sendall(data)
+            self.sock.sendall(data.encode())
         except socket.timeout:
             self.close()
             raise
 
-        except socket.sslerror:
+        except ssl.SSLError:
             self.close()
             raise
 
@@ -102,27 +100,27 @@ class ControlClient(object):
     """ fetch result of previous call
     """
     def __fetch(self):
-        buf = ''
-        buf_len = 0
+        chunks = []
+        bytes_recd = 0
 
         while True:
             try:
-                part = self.sock.read(self._bufsize - buf_len)
+                chunk = self.sock.recv(min(self._bufsize - bytes_recd, 2048))                
             except socket.timeout:
                 self.close()
                 raise
 
-            except socket.sslerror, err:
-                if (err[0] == socket.SSL_ERROR_WANT_READ or
-                    err[0] == socket.SSL_ERROR_WANT_WRITE):
+            except ssl.SSLError as err:
+                if (err[0] == ssl.SSL_ERROR_WANT_READ or
+                    err[0] == ssl.SSL_ERROR_WANT_WRITE):
                     continue
-                if (err[0] == socket.SSL_ERROR_ZERO_RETURN or
-                    err[0] == socket.SSL_ERROR_EOF):
+                if (err[0] == ssl.SSL_ERROR_ZERO_RETURN or
+                    err[0] == ssl.SSL_ERROR_EOF):
                     break
                 self.close()
                 raise
 
-            except socket.error, err:
+            except socket.error as err:
                 if err[0] == errno.EINTR:
                     continue
                 if err[0] == errno.EBADF:
@@ -132,15 +130,17 @@ class ControlClient(object):
                 self.close()
                 raise
 
-            if len(part) == 0:
+            if chunk == b'' or len(chunk) == 0:
                 break
-            buf += part
-            buf_len += len(part)
+
+            bytes_recd += len(chunk)
+            chunks.append(chunk)
 
         self.close()
         if self.strip:
-            return buf.strip()
-        return buf
+            return b''.join(chunks).decode().strip()
+
+        return b''.join(chunks).decode()
 
     """ run a command and return result
     """
@@ -148,22 +148,7 @@ class ControlClient(object):
         if self.sock is None:
             self.connect(self.host, self.port)
 
-        """send header
-        """
-        self.__send("NSDCT%d " % (self.NSD_CONTROL_VERSION))
-
-        """send command name
-        """
-        self.__send(' ' + cmd)
-
-        """send command parameters
-        """
-        for arg in args:
-            self.__send(' ' + arg)
-
-        """send break line to commit command as completed
-        """
-        self.__send("\n")
+        self.__send("NSDCT%d %s %s\n" % (self.NSD_CONTROL_VERSION, cmd, ' '.join(args)))
 
         """fetch response
         """
