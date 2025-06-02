@@ -13,7 +13,6 @@ authors = [
 license = "Apache-2.0"
 keywords = ["nsd", "api"]
 classifiers = [
-    "Programming Language :: Python :: 2",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Software Development"
