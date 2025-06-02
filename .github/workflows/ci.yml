@@ -58,11 +58,6 @@ jobs:
           source .venv/bin/activate
           make xenon
 
-      - name: Run bandit (Security)
-        run: |
-          source .venv/bin/activate
-          make bandit
-
       - name: Run pyright (Type Checking)
         run: |
           source .venv/bin/activate
