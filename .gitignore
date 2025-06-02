@@ -46,3 +46,5 @@ env33
 /.ruff_cache
 __pycache__
 /uv.lock
+/.vscode
+/.pytest_cache
