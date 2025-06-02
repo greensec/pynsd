@@ -1,55 +1,130 @@
-pynsd
-=====
+# pynsd
 
-pynsd is a library to use new control api of NSD 4 in python.
+[![PyPI](https://img.shields.io/pypi/v/pynsd)](https://pypi.org/project/pynsd/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python Version](https://img.shields.io/pypi/pyversions/pynsd)](https://pypi.org/project/pynsd/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-See: http://www.nlnetlabs.nl/svn/nsd/trunk/doc/NSD-4-features
+A modern Python client for the NSD (Name Server Daemon) control interface, providing type-safe access to NSD's control API.
 
-Additional RPC Daemon: [pynsd-rpcd](https://github.com/greensec/pynsd-rpcd)
+## Features
 
- * Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
- * Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
+- Full support for NSD 4.x control protocol
+- Type hints for better IDE support and code quality
+- Context manager support for safe resource handling
+- Comprehensive error handling with custom exceptions
+- Support for both synchronous and asynchronous operations
+- Parsed response objects with easy access to response data
 
-Licensed under the Apache License, Version 2.0 (the "License").
+## Installation
 
-Basic Example of Usage
-------------------------
+```bash
+pip install pynsd
+```
 
-To create connect to nsd host, get status, add sample zone and delete sample zone
+## Basic Usage
+
+### Connecting to NSD
 
 ```python
-import pynsd
+from pynsd import ControlClient
 
-clt = pynsd.ControlClient(clientCert='/etc/nsd/nsd_control.pem', 
-                          clientKey='/etc/nsd/nsd_control.key',
-                          host='127.0.0.1',
-                          port=8952)
-print clt.call('status')
-print clt.call('addzone', ['testzone.example.', 'cust'])
-print clt.call('delzone', ['testzone.example.'])
+# Basic connection with default settings (localhost:8953)
+with ControlClient(
+    client_cert='/etc/nsd/nsd_control.pem',
+    client_key='/etc/nsd/nsd_control.key'
+) as client:
+    # Get server status
+    status = client.status()
+    print(f"NSD is running with {status.data.get('num_zones', 0)} zones")
 ```
 
-It is also possible to use the magic method __getattr__ to call a method directly:
+### Common Operations
+
 ```python
-print clt.zonestatus('testzone.example.')
+# Add a zone
+result = client.add_zone('example.com.', 'example.com.zone')
+print(f"Added zone: {result.msg}")
+
+# Get zone status
+status = client.zonestatus('example.com.')
+print(f"Zone status: {status.data}")
+
+# Reload configuration
+client.reload()
+
+# Get server statistics
+stats = client.stats_noreset()
+print(f"Queries: {stats.data.get('num_query', 0)}")
 ```
 
-Installation
-------------
+### Error Handling
 
-```
-1. Download zip file
-2. Extract it
-3. Execute in the extracted directory: python setup.py install
-```
+```python
+from pynsd.exception import NSDCommandError, NSDConnectionError
 
-#### Development version
-
-```
-pip install -e git+git@github.com:greensec/pynsd.git
+try:
+    client.add_zone('invalid.zone', 'nonexistent.zone')
+except NSDCommandError as e:
+    print(f"Command failed: {e}")
+except NSDConnectionError as e:
+    print(f"Connection error: {e}")
 ```
 
-#### Requirements
+## Advanced Usage
 
-* Python 2.7 / 3.2 / 3.3
-* SSL support 
+### Using Raw Commands
+
+```python
+# Using raw command API
+response = client.request('addzone', ('example.org.', 'example.org.zone'))
+if response.is_success():
+    print("Zone added successfully")
+```
+
+### Custom Timeout
+
+```python
+# Set custom timeout for operations (in seconds)
+client = ControlClient(
+    client_cert='cert.pem',
+    client_key='key.pem',
+    timeout=10.0
+)
+```
+
+## Development
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/greensec/pynsd.git
+   cd pynsd
+   ```
+
+2. Install development dependencies:
+   ```bash
+   pip install -e .[dev]
+   ```
+
+### Running Tests
+
+```bash
+make test
+```
+
+### Code Quality
+
+```bash
+make validate  # Runs formatting, linting, and type checking
+```
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## See Also
+
+- [NSD Documentation](https://www.nlnetlabs.nl/documentation/nsd/)
+- [NSD Control Protocol](https://www.nlnetlabs.nl/documentation/nsd/nsd-control/)

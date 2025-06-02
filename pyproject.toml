@@ -23,6 +23,10 @@ dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/greensec/pynsd"
+Documentation = "https://github.com/greensec/pynsd#readme"
+Changelog = "https://github.com/greensec/pynsd/releases"
+Issues = "https://github.com/greensec/pynsd/issues"
+Source = "https://github.com/greensec/pynsd"
 
 [tool.setuptools]
 package-dir = { "" = ".", "pynsd" = "src/pynsd" }
