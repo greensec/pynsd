@@ -42,3 +42,7 @@ env27
 env30
 env32
 env33
+
+/.ruff_cache
+__pycache__
+/uv.lock

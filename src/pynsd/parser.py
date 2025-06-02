@@ -1,162 +1,205 @@
-# coding: utf-8
-"""
-Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
-Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-@category Novutec
-@package pynsd
-@copyright Copyright (c) 2007 - 2013 Novutec Inc. (http://www.novutec.com)
-@copyright Copyright (c) 2014 greenSec Solutions (http://www.greensec.de)
-@license http://www.apache.org/licenses/LICENSE-2.0
-"""
-
 import re
+from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
-""" generic result class with all default values set
-"""
-class ControlResult(object):
-    """ constructor which gets static values
-    """
-    def __init__(self, data):
-        self.msg = None
-        self.data = None
-        self.success = None
-        if 'success' in data:
-            self.success = data['success']
 
-        if 'msg' in data:
-            self.msg = data['msg']
+class ControlResult:
+    """Generic result class for NSD control command responses."""
 
-        if 'result' in data:
-            self.data = data['result']
+    success: Optional[bool] = None
+    msg: Optional[List[str]] = None
+    data: Optional[Dict[str, Any]] = None
 
-    """ return if call was successful
-    """
-    def isSuccess(self):
-        return self.success
+    def __init__(self, data: Dict[str, Any]) -> None:
+        """Initialize with response data.
 
-    """ get call message
-    """
-    def getMessage(self):
+        Args:
+            data: Dictionary containing response data with keys:
+                - success: Boolean indicating success
+                - msg: Optional message
+                - result: Optional result data
+        """
+
+        if "success" in data:
+            self.success = data["success"]
+        if "msg" in data:
+            self.msg = data["msg"]
+        if "result" in data:
+            self.data = data["result"]
+
+    def is_success(self) -> bool:
+        """Check if the command was successful.
+
+        Returns:
+            bool: True if the command was successful, False otherwise
+        """
+        return bool(self.success)
+
+    def get_message(self) -> Optional[List[str]]:
+        """Get the message from the command response.
+
+        Returns:
+            Optional list of message lines, or None if no message
+        """
         return self.msg
 
-    """ get call result
-    """
-    def getData(self):
+    def get_data(self) -> Optional[Dict[str, Any]]:
+        """Get the data from the command response.
+
+        Returns:
+            Optional dictionary containing the result data, or None if no data
+        """
         return self.data
 
-    def __dict__(self):
-        return { 'msg' : self.msg, 'success': self.success, 'data': self.data }
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the result to a dictionary.
 
-    def __repr__(self):
-        return self.__str__()
+        Returns:
+            Dictionary containing the result data
+        """
+        return {"msg": self.msg, "success": self.success, "data": self.data}
 
-    def __str__(self):
-        return repr(self.__dict__())
+    def __repr__(self) -> str:
+        return f"ControlResult({self.to_dict()!r})"
 
-""" nsd control protocol parser
-"""
-class ControlResultParser(object):
-    __KVRE = re.compile("""^([^:]+):\s*(.+)$""", re.M)
-    __KVRE2 = re.compile("""^([^=]+)=\s*(.+)$""", re.M)
+    def __str__(self) -> str:
+        return str(self.to_dict())
 
-    """ all static commands that normaly only return "ok"
-    """
-    __ok_commands = [ 'addzone', 'delzone', 'reconfig', 'log_reopen', 'notify' ]
 
-    """ main method to start parsing and return result object
-    """
-    @staticmethod
-    def parse(cmd, data):
-        return ControlResult(ControlResultParser.__parse(cmd, data))
+class ControlResultParser:
+    """Parser for NSD control protocol responses."""
 
-    """ start parsing process by switch to different methods for each command
-    """
-    @staticmethod
-    def __parse(cmd, data):
+    # Regular expressions for parsing key-value pairs
+    KEY_VALUE_RE: Pattern = re.compile(r"^([^:]+):\s*(.+)$", re.MULTILINE)
+    KEY_VALUE_V2_RE: Pattern = re.compile(r"^([^=]+)=\s*(.+)$", re.MULTILINE)
+
+    # Commands that typically just return "ok"
+    OK_COMMANDS: Tuple[str, ...] = (
+        "addzone",
+        "delzone",
+        "reconfig",
+        "log_reopen",
+        "notify",
+    )
+
+    @classmethod
+    def parse(cls, cmd: str, data: Union[bytes, str]) -> ControlResult:
+        """Parse the response from an NSD control command.
+
+        Args:
+            cmd: The command that was executed
+            data: The response data (as bytes or string)
+
+        Returns:
+            ControlResult: Parsed result object
+        """
+        return ControlResult(cls._parse(cmd, data))
+
+    @classmethod
+    def _parse(cls, cmd: str, data: Union[bytes, str]) -> Dict[str, Any]:
+        """Internal method to parse command response data.
+
+        Args:
+            cmd: The command that was executed
+            data: The response data (as bytes or string)
+
+        Returns:
+            Dictionary containing the parsed response
+        """
         if not data or not cmd:
-            return data
+            return {"success": False, "msg": ["No data or command provided"]}
 
-        if cmd == 'status':
-            return ControlResultParser.status(data)
-        elif cmd == 'stats' or cmd == 'stats_noreset':
-            return ControlResultParser.stats(data)
-        elif cmd == 'transfer' or cmd == 'force_transfer':
-            return ControlResultParser.transfer(data)
-        elif cmd in ControlResultParser.__ok_commands:
-            return ControlResultParser.ok_check(data)
-        return {
-            'msg': data.strip().split('\n'),
-            'success': None
-        }
+        # Convert bytes to string if needed
+        if isinstance(data, bytes):
+            try:
+                data = data.decode("utf-8")
+            except UnicodeDecodeError:
+                data = data.decode("utf-8", errors="replace")
 
-    """ parse "status" command call
-    """
-    @staticmethod
-    def status(data):
-        result = {
-            'success': False,
-            'result': {}
-        }
+        if cmd == "status":
+            return cls._parse_status(data)
+        elif cmd in ("stats", "stats_noreset"):
+            return cls._parse_stats(data)
+        elif cmd in ("transfer", "force_transfer"):
+            return cls._parse_transfer(data)
+        elif cmd in cls.OK_COMMANDS:
+            return cls._parse_ok(data)
 
-        for (ky, vl) in ControlResultParser.__KVRE.findall(data):
-            result['result'][ky] = vl
+        return {"msg": data.strip().split("\n"), "success": None}
 
-        if 'version' in result['result']:
-            result['success'] = True
+    @classmethod
+    def _parse_status(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'status' command.
 
-        return result
+        Args:
+            data: The response data as a string
 
-    """ parse "stats" command call
-    """
-    @staticmethod
-    def stats(data):
-        result = {
-            'success': False,
-            'result': {}
-        }
-        for (ky, vl) in ControlResultParser.__KVRE2.findall(data):
-            result['result'][ky] = vl
+        Returns:
+            Dictionary containing the parsed status
+        """
+        result: Dict[str, Any] = {"success": False, "result": {}}
 
-        if 'time.elapsed' in result['result']:
-            result['success'] = True
+        for key, value in cls.KEY_VALUE_RE.findall(data):
+            result["result"][key] = value
+
+        if "version" in result["result"]:
+            result["success"] = True
 
         return result
 
-    """ parse static OK command calls
-    """
-    @staticmethod
-    def ok_check(data):
-        result = {
-            'msg': data.strip().split('\n'),
-            'success': False
-        }
+    @classmethod
+    def _parse_stats(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'stats' or 'stats_noreset' command.
 
-        if 'ok' in result['msg'] or re.search('^ok,', data):
-            result['success'] = True
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary containing the parsed statistics
+        """
+        result: Dict[str, Any] = {"success": False, "result": {}}
+
+        for key, value in cls.KEY_VALUE_V2_RE.findall(data):
+            result["result"][key] = value
+
+        if "time.elapsed" in result["result"]:
+            result["success"] = True
+
         return result
 
-    """ parse zone transfer command calls
-    """
     @staticmethod
-    def transfer(data):
-        result = ControlResultParser.ok_check(data)
-        result['zones'] = None
-        if result['success'] :
-            f = re.search('(\d+) zones', data, re.I)
-            if f:
-                result['zones'] = int(f.group(1))
+    def _parse_ok(data: str) -> Dict[str, Any]:
+        """Parse a simple 'ok' response.
+
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary with success status and message
+        """
+        lines = [line.strip() for line in data.strip().split("\n") if line.strip()]
+        is_ok = any(line == "ok" or line.startswith("ok,") for line in lines)
+
+        return {"msg": lines, "success": is_ok}
+
+    @classmethod
+    def _parse_transfer(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'transfer' or 'force_transfer' command.
+
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary containing the transfer result
+        """
+        result = cls._parse_ok(data)
+        result["zones"] = None
+
+        if result["success"]:
+            match = re.search(r"(\d+)\s+zones", data, re.IGNORECASE)
+            if match:
+                try:
+                    result["zones"] = int(match.group(1))
+                except (ValueError, IndexError):
+                    pass
 
         return result
