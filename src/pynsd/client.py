@@ -55,14 +55,27 @@ class Client:
         port: int = 8952,
         bufsize: Optional[int] = None,
         timeout: Optional[float] = None,
+        ssl_verify: bool = True,
     ) -> None:
-        """Initialize the NSD control client."""
+        """Initialize the NSD control client.
+
+        Args:
+            client_cert: Path to the client certificate file (PEM format)
+            client_key: Path to the client private key file (PEM format)
+            host: NSD server hostname or IP address. Defaults to '127.0.0.1'
+            port: NSD control port. Defaults to 8952
+            bufsize: Buffer size for socket operations. Defaults to 8192
+            timeout: Connection and operation timeout in seconds. Defaults to 30.0
+            ssl_verify: Whether to verify the server's SSL certificate. Set to False to disable
+                      certificate verification (useful for self-signed certificates). Defaults to True.
+        """
         self.client_cert = Path(client_cert)
         self.client_key = Path(client_key)
         self.host = host
         self.port = port
         self._bufsize = bufsize or BUFSIZE
         self.timeout = timeout or DEFAULT_TIMEOUT
+        self.ssl_verify = ssl_verify
         self.sock: Optional[ssl.SSLSocket] = None
 
         # Validate certificate and key files
@@ -182,9 +195,15 @@ class Client:
         logger.info("Connecting to NSD control at %s:%d", self.host, self.port)
 
         try:
-            # Create SSL context with secure defaults
+            # Create SSL context
             context = ssl.create_default_context()
             context.load_cert_chain(certfile=str(self.client_cert), keyfile=str(self.client_key))
+
+            # Configure SSL verification
+            if not self.ssl_verify:
+                logger.info("SSL certificate verification is disabled. This is not recommended for production use.")
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
 
             # Configure timeouts
             sock = socket.create_connection((self.host, self.port), timeout=self.timeout)

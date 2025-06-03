@@ -36,6 +36,16 @@ with pynsd.Client(
     host='127.0.0.1',
     port=8953
 ) as client:
+    # ...
+
+# For self-signed certificates without hostname verification
+with pynsd.Client(
+    client_cert='/etc/nsd/nsd_control.pem',
+    client_key='/etc/nsd/nsd_control.key',
+    host='nsd.example.com',
+    port=8953,
+    ssl_verify=False  # Disable SSL certificate verification
+) as client:
     # Get server status
     status = client.status()
     print(f"NSD is running with {status.data.get('num_zones', 0)} zones")

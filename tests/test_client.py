@@ -1,6 +1,7 @@
 """Unit tests for the NSD control client."""
 import os
 import socket
+import ssl
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -92,6 +93,42 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
         }
         params.update(kwargs)
         return Client(**params)
+
+    @patch('ssl.create_default_context')
+    def test_connect_with_ssl_verify_false(self, mock_ssl_context):
+        """Test connection with SSL verification disabled."""
+        # Setup mocks
+        mock_context = MagicMock()
+        mock_ssl_context.return_value = mock_context
+        
+        # Create client with ssl_verify=False
+        client = self.create_client(ssl_verify=False)
+        
+        # Mock the socket connection
+        mock_socket = MagicMock()
+        mock_connect = MagicMock(return_value=mock_socket)
+        
+        with patch('socket.create_connection', mock_connect):
+            # Configure the wrap_socket mock
+            mock_ssl_socket = MagicMock()
+            mock_context.wrap_socket.return_value = mock_ssl_socket
+            
+            # Test connection
+            client.connect()
+            
+            # Verify SSL context was configured to skip verification
+            mock_ssl_context.assert_called_once()
+            self.assertFalse(mock_context.check_hostname)
+            self.assertEqual(mock_context.verify_mode, ssl.CERT_NONE)
+            
+            # Verify the rest of the connection process
+            mock_connect.assert_called_once_with((self.host, self.port), timeout=client.timeout)
+            mock_context.wrap_socket.assert_called_once_with(
+                mock_socket, server_hostname=self.host, server_side=False
+            )
+            mock_ssl_socket.setsockopt.assert_any_call(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            mock_ssl_socket.settimeout.assert_called_with(client.timeout)
+            self.assertEqual(client.sock, mock_ssl_socket)
 
     @patch("ssl.SSLContext.wrap_socket")
     @patch("socket.create_connection")
