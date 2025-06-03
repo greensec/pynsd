@@ -6,7 +6,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 from .exception import NSDCommandError, NSDConfigurationError, NSDConnectionError, NSDError, NSDTimeoutError
 
-from .parser import ResponseParser
+from .parser import Response, ResponseParser
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ class Client:
 
         Example:
             ```python
-            with ControlClient('client.crt', 'client.key') as client:
+            with pynsd.Client('client.crt', 'client.key') as client:
                 result = client.call('status')
             ```
         """
@@ -172,7 +172,7 @@ class Client:
 
         Example:
             ```python
-            client = ControlClient('client.crt', 'client.key')
+            client = pynsd.Client('client.crt', 'client.key')
             client.connect('nsd.example.com', 8953)
             ```
         """
@@ -359,7 +359,7 @@ class Client:
                 raise NSDError(f"Failed to fetch data: {e}") from e
             raise
 
-    def request(self, command: str, args: Tuple[Any, ...] = (), timeout: Optional[float] = None) -> Any:
+    def request(self, command: str, args: Tuple[Any, ...] = (), timeout: Optional[float] = None) -> Union[str, Response]:
         """Send a command to the NSD control port and return the response.
 
         Args:

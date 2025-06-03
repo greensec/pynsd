@@ -27,14 +27,14 @@ pip install pynsd
 ### Connecting to NSD
 
 ```python
-from pynsd import ControlClient
+import pynsd
 
 # Basic connection with default settings (localhost:8953)
-with ControlClient(
-    host='127.0.0.1',
-    port=8953,
+with pynsd.Client(
     client_cert='/etc/nsd/nsd_control.pem',
-    client_key='/etc/nsd/nsd_control.key'
+    client_key='/etc/nsd/nsd_control.key',
+    host='127.0.0.1',
+    port=8953
 ) as client:
     # Get server status
     status = client.status()
@@ -63,7 +63,7 @@ print(f"Queries: {stats.data.get('num_query', 0)}")
 ### Error Handling
 
 ```python
-from pynsd.exception import NSDCommandError, NSDConnectionError
+from pynsd import NSDCommandError, NSDConnectionError
 
 try:
     client.add_zone('invalid.zone', 'nonexistent.zone')
@@ -88,7 +88,7 @@ if response.is_success():
 
 ```python
 # Set custom timeout for operations (in seconds)
-client = ControlClient(
+client = pynsd.Client(
     client_cert='cert.pem',
     client_key='key.pem',
     timeout=10.0

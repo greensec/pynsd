@@ -90,7 +90,7 @@ class ResponseParser:
             data: The response data (as bytes or string)
 
         Returns:
-            ControlResult: Parsed result object
+            Response: Parsed result object
         """
         return Response(cls._parse(cmd, data))
 
