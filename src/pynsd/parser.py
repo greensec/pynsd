@@ -2,7 +2,7 @@ import re
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 
-class ControlResult:
+class Response:
     """Generic result class for NSD control command responses."""
 
     success: Optional[bool] = None
@@ -65,7 +65,7 @@ class ControlResult:
         return str(self.to_dict())
 
 
-class ControlResultParser:
+class ResponseParser:
     """Parser for NSD control protocol responses."""
 
     # Regular expressions for parsing key-value pairs
@@ -82,7 +82,7 @@ class ControlResultParser:
     )
 
     @classmethod
-    def parse(cls, cmd: str, data: Union[bytes, str]) -> ControlResult:
+    def parse(cls, cmd: str, data: Union[bytes, str]) -> Response:
         """Parse the response from an NSD control command.
 
         Args:
@@ -92,7 +92,7 @@ class ControlResultParser:
         Returns:
             ControlResult: Parsed result object
         """
-        return ControlResult(cls._parse(cmd, data))
+        return Response(cls._parse(cmd, data))
 
     @classmethod
     def _parse(cls, cmd: str, data: Union[bytes, str]) -> Dict[str, Any]:

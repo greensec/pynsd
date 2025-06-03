@@ -4,9 +4,9 @@ import ssl
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
-from pynsd.exception import NSDCommandError, NSDConfigurationError, NSDConnectionError, NSDError, NSDTimeoutError
+from .exception import NSDCommandError, NSDConfigurationError, NSDConnectionError, NSDError, NSDTimeoutError
 
-from .parser import ControlResultParser
+from .parser import ResponseParser
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ BUFSIZE = 8192
 DEFAULT_TIMEOUT = 30.0
 
 
-class ControlClient:
+class Client:
     """Client for interacting with the NSD (Name Server Daemon) control interface.
 
     This class provides a high-level interface to communicate with NSD's control port
@@ -93,7 +93,7 @@ class ControlClient:
         except (IOError, OSError) as e:
             raise NSDConfigurationError(f"Failed to read certificate or key file: {e}") from e
 
-    def __enter__(self) -> "ControlClient":
+    def __enter__(self) -> "Client":
         """Enter the runtime context related to this object.
 
         Returns:
@@ -397,7 +397,7 @@ class ControlClient:
             if not self.parse:
                 return response
 
-            result = ControlResultParser.parse(command, response)
+            result = ResponseParser.parse(command, response)
             if not result.is_success():
                 error_msg = f"Command '{command}' failed"
                 if result.msg:

@@ -31,6 +31,8 @@ from pynsd import ControlClient
 
 # Basic connection with default settings (localhost:8953)
 with ControlClient(
+    host='127.0.0.1',
+    port=8953,
     client_cert='/etc/nsd/nsd_control.pem',
     client_key='/etc/nsd/nsd_control.key'
 ) as client:

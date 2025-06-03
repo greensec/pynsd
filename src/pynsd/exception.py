@@ -2,7 +2,7 @@
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .parser import ControlResult
+    from .parser import Response
 
 
 class NSDError(Exception):
@@ -20,7 +20,7 @@ class NSDTimeoutError(NSDError):
 class NSDCommandError(NSDError):
     """Raised when an NSD command fails."""
 
-    def __init__(self, message: str, response: Optional["ControlResult"] = None):
+    def __init__(self, message: str, response: Optional["Response"] = None):
         self.response = response
         super().__init__(message)
 

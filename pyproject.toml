@@ -33,7 +33,7 @@ packages = ["pynsd"]
 zip-safe = false
 
 [tool.setuptools.dynamic]
-version = {file = ["VERSION"]}
+version = {file = ["src/pynsd/VERSION"]}
 
 
 [dependency-groups]

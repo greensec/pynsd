@@ -1,21 +1,17 @@
 """Unit tests for the NSD control client."""
 import os
 import socket
-import ssl
 import tempfile
 import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock, patch
 
-from pynsd.client import ControlClient, NSD_CONTROL_VERSION
+from pynsd.client import Client, NSD_CONTROL_VERSION
 from pynsd.exception import (
     NSDCommandError,
     NSDConfigurationError,
     NSDConnectionError,
-    NSDError,
     NSDTimeoutError,
 )
-from pynsd.parser import ControlResult
 
 
 class TestControlClient(unittest.TestCase):
@@ -95,7 +91,7 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
             "port": self.port,
         }
         params.update(kwargs)
-        return ControlClient(**params)
+        return Client(**params)
 
     @patch("ssl.SSLContext.wrap_socket")
     @patch("socket.create_connection")
@@ -134,7 +130,7 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
         with tempfile.NamedTemporaryFile() as temp_file:
             # Use a non-existent cert file
             with self.assertRaises(NSDConfigurationError):
-                client = ControlClient(
+                client = Client(
                     client_cert="/nonexistent/cert.pem",
                     client_key=temp_file.name,
                 )
@@ -145,7 +141,7 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
         with tempfile.NamedTemporaryFile() as temp_file:
             with self.assertRaises(NSDConfigurationError):
                 # Use a non-existent key file
-                client = ControlClient(
+                client = Client(
                     client_cert=temp_file.name,
                     client_key="/nonexistent/key.pem",
                 )
