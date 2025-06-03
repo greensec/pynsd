@@ -41,8 +41,6 @@ class Client:
         host: NSD server hostname or IP address. Defaults to '127.0.0.1'
         port: NSD control port. Defaults to 8952
         bufsize: Buffer size for socket operations. Defaults to 8192
-        strip: Whether to strip whitespace from responses. Defaults to False
-        parse: Whether to parse responses. Defaults to True
         timeout: Connection and operation timeout in seconds. Defaults to 30.0
 
     Raises:
@@ -56,8 +54,6 @@ class Client:
         host: str = "127.0.0.1",
         port: int = 8952,
         bufsize: Optional[int] = None,
-        strip: bool = False,
-        parse: bool = True,
         timeout: Optional[float] = None,
     ) -> None:
         """Initialize the NSD control client."""
@@ -66,8 +62,6 @@ class Client:
         self.host = host
         self.port = port
         self._bufsize = bufsize or BUFSIZE
-        self.strip = strip
-        self.parse = parse
         self.timeout = timeout or DEFAULT_TIMEOUT
         self.sock: Optional[ssl.SSLSocket] = None
 
@@ -277,8 +271,6 @@ class Client:
 
         # Get response
         response = self._fetch()
-        if self.strip:
-            response = response.strip()
 
         return response
 
@@ -359,7 +351,7 @@ class Client:
                 raise NSDError(f"Failed to fetch data: {e}") from e
             raise
 
-    def request(self, command: str, args: Tuple[Any, ...] = (), timeout: Optional[float] = None) -> Union[str, Response]:
+    def request(self, command: str, args: Tuple[Any, ...] = (), timeout: Optional[float] = None) -> Response:
         """Send a command to the NSD control port and return the response.
 
         Args:
@@ -368,7 +360,7 @@ class Client:
             timeout: Optional timeout in seconds (overrides instance timeout)
 
         Returns:
-            Parsed response if self.parse is True, otherwise raw response string
+            Parsed response
 
         Raises:
             NSDCommandError: If the command fails on the server side
@@ -392,10 +384,6 @@ class Client:
 
             # Build and send command and get response
             response = self._send_receive(command, args)
-
-            # Parse response if needed
-            if not self.parse:
-                return response
 
             result = ResponseParser.parse(command, response)
             if not result.is_success():

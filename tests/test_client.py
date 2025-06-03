@@ -280,7 +280,7 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
         mock_ssl_socket.recv.side_effect = [b"error: invalid command\n", b""]
 
         # Test
-        client = self.create_client(parse=True)
+        client = self.create_client()
         with self.assertRaises(NSDCommandError) as cm:
             client.request("invalid")
         self.assertIn("invalid command", str(cm.exception))
