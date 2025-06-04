@@ -73,14 +73,7 @@ class ResponseParser:
     KEY_VALUE_V2_RE: Pattern = re.compile(r"^([^=]+)=\s*(.+)$", re.MULTILINE)
 
     # Commands that typically just return "ok"
-    OK_COMMANDS: Tuple[str, ...] = (
-        "addzone",
-        "delzone",
-        "reconfig",
-        "log_reopen",
-        "notify",
-        "reload"
-    )
+    OK_COMMANDS: Tuple[str, ...] = ("addzone", "delzone", "reconfig", "log_reopen", "notify", "reload")
 
     @classmethod
     def parse(cls, cmd: str, data: Union[bytes, str]) -> Response:
