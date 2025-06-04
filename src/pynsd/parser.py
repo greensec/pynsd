@@ -79,6 +79,7 @@ class ResponseParser:
         "reconfig",
         "log_reopen",
         "notify",
+        "reload"
     )
 
     @classmethod
