@@ -1,6 +1,8 @@
 import logging
 import socket
 import ssl
+import enum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
@@ -21,6 +23,61 @@ BUFSIZE = 8192
 DEFAULT_TIMEOUT = 30.0
 
 
+class NSDCommand(enum.Enum):
+    """Enumeration of all NSD control commands."""
+
+    # Server control commands
+    STOP = "stop"
+    RELOAD = "reload"
+    RECONFIG = "reconfig"
+    REPATTERN = "repattern"
+    LOG_REOPEN = "log_reopen"
+
+    # Zone management commands
+    ADD_ZONE = "addzone"
+    DEL_ZONE = "delzone"
+    CHANGE_ZONE = "changezone"
+    ADD_ZONES = "addzones"
+    DEL_ZONES = "delzones"
+    WRITE = "write"
+    NOTIFY = "notify"
+    TRANSFER = "transfer"
+    FORCE_TRANSFER = "force_transfer"
+    ZONE_STATUS = "zonestatus"
+
+    # Server information
+    STATUS = "status"
+    STATS = "stats"
+    STATS_NO_RESET = "stats_noreset"
+    SERVER_PID = "serverpid"
+
+    # TSIG key management
+    PRINT_TSIG = "print_tsig"
+    UPDATE_TSIG = "update_tsig"
+    ADD_TSIG = "add_tsig"
+    DEL_TSIG = "del_tsig"
+    ASSOC_TSIG = "assoc_tsig"
+
+    # Cookie secrets
+    ADD_COOKIE_SECRET = "add_cookie_secret"
+    DROP_COOKIE_SECRET = "drop_cookie_secret"
+    ACTIVATE_COOKIE_SECRET = "activate_cookie_secret"
+    PRINT_COOKIE_SECRETS = "print_cookie_secrets"
+
+    # Verbosity control
+    VERBOSITY = "verbosity"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+@dataclass
+class Request:
+    args: Tuple[Any, ...]
+    command: NSDCommand | None = None
+    command_other: str | None = None
+
+
 class Client:
     """Client for interacting with the NSD (Name Server Daemon) control interface.
 
@@ -38,6 +95,7 @@ class Client:
     Args:
         client_cert: Path to the client certificate file (PEM format)
         client_key: Path to the client private key file (PEM format)
+        server_cert: Optional path to the server certificate file (PEM format)
         host: NSD server hostname or IP address. Defaults to '127.0.0.1'
         port: NSD control port. Defaults to 8952
         bufsize: Buffer size for socket operations. Defaults to 8192
@@ -51,6 +109,7 @@ class Client:
         self,
         client_cert: Union[str, Path],
         client_key: Union[str, Path],
+        server_cert: Optional[Union[str, Path]] = None,
         host: str = "127.0.0.1",
         port: int = 8952,
         bufsize: Optional[int] = None,
@@ -62,6 +121,7 @@ class Client:
         Args:
             client_cert: Path to the client certificate file (PEM format)
             client_key: Path to the client private key file (PEM format)
+            server_cert: Optional path to the server certificate file (PEM format)
             host: NSD server hostname or IP address. Defaults to '127.0.0.1'
             port: NSD control port. Defaults to 8952
             bufsize: Buffer size for socket operations. Defaults to 8192
@@ -71,6 +131,7 @@ class Client:
         """
         self.client_cert = Path(client_cert)
         self.client_key = Path(client_key)
+        self.server_cert = Path(server_cert) if server_cert else None
         self.host = host
         self.port = port
         self._bufsize = bufsize or BUFSIZE
@@ -97,6 +158,12 @@ class Client:
             # Try to read the files to verify permissions
             self.client_cert.read_bytes()
             self.client_key.read_bytes()
+
+            if self.server_cert:
+                if not self.server_cert.exists():
+                    raise NSDConfigurationError(f"Server certificate file not found: {self.server_cert}")
+                # Try to read the files to verify permissions
+                self.server_cert.read_bytes()
         except (IOError, OSError) as e:
             raise NSDConfigurationError(f"Failed to read certificate or key file: {e}") from e
 
@@ -198,6 +265,9 @@ class Client:
             # Create SSL context
             context = ssl.create_default_context()
             context.load_cert_chain(certfile=str(self.client_cert), keyfile=str(self.client_key))
+
+            if self.server_cert and self.server_key:
+                context.load_verify_locations(cafile=str(self.server_cert))
 
             # Configure SSL verification
             if not self.ssl_verify:
@@ -309,7 +379,7 @@ class Client:
 
         try:
             if isinstance(data, str):
-                data = data.encode("utf-8")
+                data = data.encode("ascii")
             self.sock.sendall(data)
         except (socket.timeout, ssl.SSLError, socket.error):
             self.close()
@@ -357,12 +427,12 @@ class Client:
 
             # Decode to string with error handling
             try:
-                return response.decode("utf-8")
+                return response.decode("ascii")
             except UnicodeDecodeError as e:
                 error_msg = f"Failed to decode response: {e}"
                 logger.error(error_msg)
                 # Return a best-effort decoded string with replacement characters
-                return response.decode("utf-8", errors="replace")
+                return response.decode("ascii", errors="replace")
 
         except Exception as e:
             if not isinstance(e, NSDError):

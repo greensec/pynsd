@@ -73,7 +73,25 @@ class ResponseParser:
     KEY_VALUE_V2_RE: Pattern = re.compile(r"^([^=]+)=\s*(.+)$", re.MULTILINE)
 
     # Commands that typically just return "ok"
-    OK_COMMANDS: Tuple[str, ...] = ("addzone", "delzone", "reconfig", "log_reopen", "notify", "reload")
+    OK_COMMANDS: Tuple[str, ...] = (
+        "addzone",
+        "delzone",
+        "reconfig",
+        "log_reopen",
+        "notify",
+        "reload",
+        "stop",
+        "repattern",
+        "write",
+        "verbosity",
+        "update_tsig",
+        "add_tsig",
+        "del_tsig",
+        "assoc_tsig",
+        "add_cookie_secret",
+        "drop_cookie_secret",
+        "activate_cookie_secret",
+    )
 
     @classmethod
     def parse(cls, cmd: str, data: Union[bytes, str]) -> Response:
@@ -105,20 +123,31 @@ class ResponseParser:
         # Convert bytes to string if needed
         if isinstance(data, bytes):
             try:
-                data = data.decode("utf-8")
+                data = data.decode("ascii")
             except UnicodeDecodeError:
-                data = data.decode("utf-8", errors="replace")
+                data = data.decode("ascii", errors="replace")
 
+        # Strip any whitespace
+        data = data.strip()
+
+        # Route to appropriate parser based on command
         if cmd == "status":
             return cls._parse_status(data)
         elif cmd in ("stats", "stats_noreset"):
             return cls._parse_stats(data)
         elif cmd in ("transfer", "force_transfer"):
             return cls._parse_transfer(data)
+        elif cmd == "zonestatus":
+            return cls._parse_zonestatus(data)
+        elif cmd == "print_tsig":
+            return cls._parse_tsig_info(data)
+        elif cmd == "print_cookie_secrets":
+            return cls._parse_cookie_secrets(data)
         elif cmd in cls.OK_COMMANDS:
             return cls._parse_ok(data)
 
-        return {"msg": data.strip().split("\n"), "success": None}
+        # Default case for unknown commands
+        return {"msg": data.split("\n") if data else [], "success": None}
 
     @classmethod
     def _parse_status(cls, data: str) -> Dict[str, Any]:
@@ -189,11 +218,90 @@ class ResponseParser:
         result["zones"] = None
 
         if result["success"]:
-            match = re.search(r"(\d+)\s+zones", data, re.IGNORECASE)
+            match = re.search(r"(\d+)\s+zones?\b", data, re.IGNORECASE)
             if match:
                 try:
                     result["zones"] = int(match.group(1))
                 except (ValueError, IndexError):
                     pass
+
+        return result
+
+    @classmethod
+    def _parse_zonestatus(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'zonestatus' command.
+
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary containing the zone status information
+        """
+        result: Dict[str, Any] = {"success": False, "result": {}}
+        current_zone = None
+
+        for line in data.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+
+            # New zone section starts with zone name
+            if ":" not in line and "=" not in line and not line.startswith("["):
+                current_zone = line.strip()
+                result["result"][current_zone] = {}
+            elif current_zone and ":" in line:
+                key, value = line.split(":", 1)
+                result["result"][current_zone][key.strip()] = value.strip()
+
+        result["success"] = bool(result["result"])
+        return result
+
+    @classmethod
+    def _parse_tsig_info(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'print_tsig' command.
+
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary containing TSIG key information
+        """
+        result: Dict[str, Any] = {"success": True, "result": {}}
+        current_key = None
+
+        for line in data.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+
+            # New TSIG key section
+            if ":" not in line:
+                current_key = line.strip()
+                result["result"][current_key] = {}
+            elif current_key and ":" in line:
+                key, value = line.split(":", 1)
+                result["result"][current_key][key.strip()] = value.strip()
+
+        return result
+
+    @classmethod
+    def _parse_cookie_secrets(cls, data: str) -> Dict[str, Any]:
+        """Parse the response from the 'print_cookie_secrets' command.
+
+        Args:
+            data: The response data as a string
+
+        Returns:
+            Dictionary containing cookie secret information
+        """
+        result: Dict[str, Any] = {"success": True, "result": []}
+
+        for line in data.split("\n"):
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+
+            secret, status = line.split("=", 1)
+            result["result"].append({"secret": secret.strip(), "status": status.strip()})
 
         return result
