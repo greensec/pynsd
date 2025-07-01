@@ -266,7 +266,7 @@ class Client:
             context = ssl.create_default_context()
             context.load_cert_chain(certfile=str(self.client_cert), keyfile=str(self.client_key))
 
-            if self.server_cert and self.server_key:
+            if self.server_cert:
                 context.load_verify_locations(cafile=str(self.server_cert))
 
             # Configure SSL verification
