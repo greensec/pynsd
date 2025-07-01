@@ -74,8 +74,8 @@ class NSDCommand(enum.Enum):
 @dataclass
 class Request:
     args: Tuple[Any, ...]
-    command: NSDCommand | None = None
-    command_other: str | None = None
+    command: Optional[NSDCommand] = None
+    command_other: Optional[str] = None
 
 
 class Client:
