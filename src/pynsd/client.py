@@ -142,7 +142,7 @@ class Client:
         # Validate certificate and key files
         self._validate_cert_files()
 
-        logger.debug("Initialized NSD client: %s:%d (cert: %s, key: %s)", self.host, self.port, self.client_cert, self.client_key)
+        logger.debug("Initialized NSD client: %s:%d (cert: %s, key: %s, ca: %s)", self.host, self.port, self.client_cert, self.client_key, self.server_cert)
 
     def _validate_cert_files(self) -> None:
         """Validate that certificate and key files exist and are accessible.
@@ -460,7 +460,6 @@ class Client:
         if not isinstance(command, str) or not command.strip():
             raise ValueError("Command must be a non-empty string")
 
-        original_timeout = None
         try:
             # Ensure we're connected
             if self.sock is None:
@@ -468,7 +467,6 @@ class Client:
 
             # Set temporary timeout if specified
             if timeout is not None and self.sock is not None:
-                original_timeout = self.sock.gettimeout()
                 self.sock.settimeout(timeout)
 
             # Build and send command and get response
@@ -489,9 +487,5 @@ class Client:
             raise
 
         finally:
-            # Restore original timeout if it was changed
-            if original_timeout is not None and self.sock is not None:
-                try:
-                    self.sock.settimeout(original_timeout)
-                except OSError:
-                    pass  # Socket might be closed
+            # close after command as connection is only suitable for one command
+            self.close()
