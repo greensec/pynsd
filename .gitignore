@@ -49,3 +49,4 @@ __pycache__
 /.vscode
 /.pytest_cache
 /.vscode
+/.venv

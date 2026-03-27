@@ -4,6 +4,7 @@ import socket
 import ssl
 import tempfile
 import unittest
+from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
 from pynsd.client import Client, NSD_CONTROL_VERSION
@@ -124,7 +125,7 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
             # Verify the rest of the connection process
             mock_connect.assert_called_once_with((self.host, self.port), timeout=client.timeout)
             mock_context.wrap_socket.assert_called_once_with(
-                mock_socket, server_hostname=self.host, server_side=False
+                mock_socket, server_hostname=self.host
             )
             mock_ssl_socket.setsockopt.assert_any_call(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             mock_ssl_socket.settimeout.assert_called_with(client.timeout)
@@ -321,6 +322,207 @@ qwaypVfkTx0BLFSyO1fFxtfObA==
         with self.assertRaises(NSDCommandError) as cm:
             client.request("invalid")
         self.assertIn("invalid command", str(cm.exception))
+
+
+class TestClientInit(unittest.TestCase):
+    """Tests for Client initialization and cert validation."""
+
+    def setUp(self):
+        self.cert_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.key_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.cert_file.write(b"dummy")
+        self.key_file.write(b"dummy")
+        self.cert_file.close()
+        self.key_file.close()
+
+    def tearDown(self):
+        os.unlink(self.cert_file.name)
+        os.unlink(self.key_file.name)
+
+    def test_tcp_init_sets_unix_socket_none(self):
+        client = Client(client_cert=self.cert_file.name, client_key=self.key_file.name)
+        self.assertIsNone(client.unix_socket)
+
+    def test_unix_socket_init(self):
+        from pathlib import Path
+        client = Client(
+            client_cert=self.cert_file.name,
+            client_key=self.key_file.name,
+            unix_socket="/tmp/nsd_test.sock",
+        )
+        self.assertEqual(client.unix_socket, Path("/tmp/nsd_test.sock"))
+        self.assertIsNone(client.host)
+        self.assertEqual(client.port, 0)
+
+    def test_unix_socket_skips_cert_validation(self):
+        # Nonexistent cert paths are fine when unix_socket is set
+        client = Client(
+            client_cert="/nonexistent/cert.pem",
+            client_key="/nonexistent/key.pem",
+            unix_socket="/tmp/nsd_test.sock",
+        )
+        self.assertIsNotNone(client.unix_socket)
+
+    def test_validate_cert_files_missing_server_cert(self):
+        with self.assertRaises(NSDConfigurationError):
+            Client(
+                client_cert=self.cert_file.name,
+                client_key=self.key_file.name,
+                server_cert="/nonexistent/server.pem",
+            )
+
+
+class TestClientClose(unittest.TestCase):
+    """Tests for close() behaviour."""
+
+    def setUp(self):
+        self.cert_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.key_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.cert_file.write(b"dummy")
+        self.key_file.write(b"dummy")
+        self.cert_file.close()
+        self.key_file.close()
+
+    def tearDown(self):
+        os.unlink(self.cert_file.name)
+        os.unlink(self.key_file.name)
+
+    def test_close_idempotent_when_not_connected(self):
+        client = Client(client_cert=self.cert_file.name, client_key=self.key_file.name)
+        client.close()  # should not raise
+        client.close()  # still should not raise
+
+    @patch("ssl.SSLContext.load_cert_chain")
+    @patch("ssl.SSLContext.wrap_socket")
+    @patch("socket.create_connection")
+    def test_close_continues_after_shutdown_error(self, mock_connect, mock_wrap_socket, _mock_load):
+        mock_socket = MagicMock()
+        mock_connect.return_value = mock_socket
+        mock_ssl_socket = MagicMock()
+        mock_wrap_socket.return_value = mock_ssl_socket
+        mock_ssl_socket.shutdown.side_effect = OSError("already closed")
+
+        client = Client(client_cert=self.cert_file.name, client_key=self.key_file.name)
+        client.connect()
+        client.close()  # shutdown raises but close() should still finish cleanly
+
+        self.assertIsNone(client.sock)
+        mock_ssl_socket.close.assert_called_once()
+
+
+class TestClientErrors(unittest.TestCase):
+    """Tests for error handling in request / _fetch / __getattr__."""
+
+    def setUp(self):
+        self.cert_file = tempfile.NamedTemporaryFile(delete=False)
+        self.key_file = tempfile.NamedTemporaryFile(delete=False)
+        self.cert_file.write(b"dummy")
+        self.key_file.write(b"dummy")
+        self.cert_file.close()
+        self.key_file.close()
+
+    def tearDown(self):
+        os.unlink(self.cert_file.name)
+        os.unlink(self.key_file.name)
+
+    def _make_client(self, **kwargs: Any) -> Client:
+        params: Dict[str, Any] = {"client_cert": self.cert_file.name, "client_key": self.key_file.name}
+        params.update(kwargs)
+        return Client(**params)
+
+    def test_request_empty_command_raises_value_error(self):
+        client = self._make_client()
+        with self.assertRaises(ValueError):
+            client.request("")
+
+    def test_request_whitespace_command_raises_value_error(self):
+        client = self._make_client()
+        with self.assertRaises(ValueError):
+            client.request("   ")
+
+    @patch("ssl.SSLContext.load_cert_chain")
+    @patch("ssl.SSLContext.wrap_socket")
+    @patch("socket.create_connection")
+    def test_request_connection_reset_raises_nsd_connection_error(self, mock_connect, mock_wrap_socket, _mock_load):
+        mock_socket = MagicMock()
+        mock_connect.return_value = mock_socket
+        mock_ssl_socket = MagicMock()
+        mock_wrap_socket.return_value = mock_ssl_socket
+        mock_ssl_socket.recv.side_effect = ConnectionResetError("connection reset")
+
+        client = self._make_client()
+        with self.assertRaises(NSDConnectionError):
+            client.request("status")
+
+    @patch("ssl.SSLContext.load_cert_chain")
+    @patch("ssl.SSLContext.wrap_socket")
+    @patch("socket.create_connection")
+    def test_request_per_call_timeout_is_applied(self, mock_connect, mock_wrap_socket, _mock_load):
+        mock_socket = MagicMock()
+        mock_connect.return_value = mock_socket
+        mock_ssl_socket = MagicMock()
+        mock_wrap_socket.return_value = mock_ssl_socket
+        mock_ssl_socket.recv.side_effect = [b"ok\n", b""]
+
+        client = self._make_client()
+        client.request("notify", ("example.com",), timeout=5.0)
+
+        mock_ssl_socket.settimeout.assert_any_call(5.0)
+
+    def test_getattr_dunder_raises_attribute_error(self):
+        client = self._make_client()
+        with self.assertRaises(AttributeError):
+            _ = client.__nonexistent__
+
+    @patch("ssl.SSLContext.wrap_socket")
+    @patch("socket.create_connection")
+    def test_getattr_kwargs_raises_type_error(self, mock_connect, mock_wrap_socket):
+        mock_socket = MagicMock()
+        mock_connect.return_value = mock_socket
+        mock_ssl_socket = MagicMock()
+        mock_wrap_socket.return_value = mock_ssl_socket
+
+        client = self._make_client()
+        with self.assertRaises(TypeError):
+            client.notify(zone="example.com")
+
+
+class TestClientUnixSocket(unittest.TestCase):
+    """Tests for Unix domain socket connections."""
+
+    def setUp(self):
+        self.cert_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.key_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        self.cert_file.write(b"dummy")
+        self.key_file.write(b"dummy")
+        self.cert_file.close()
+        self.key_file.close()
+
+    def tearDown(self):
+        os.unlink(self.cert_file.name)
+        os.unlink(self.key_file.name)
+
+    @patch("ssl.create_default_context")
+    @patch("socket.socket")
+    def test_connect_via_unix_socket(self, mock_socket_cls, mock_ssl_context):
+        mock_sock = MagicMock()
+        mock_socket_cls.return_value = mock_sock
+        mock_context = MagicMock()
+        mock_ssl_context.return_value = mock_context
+        mock_ssl_sock = MagicMock()
+        mock_context.wrap_socket.return_value = mock_ssl_sock
+
+        client = Client(
+            client_cert=self.cert_file.name,
+            client_key=self.key_file.name,
+            unix_socket="/tmp/nsd_test.sock",
+        )
+        client.connect()
+
+        mock_socket_cls.assert_called_once_with(socket.AF_UNIX, socket.SOCK_STREAM)
+        mock_sock.connect.assert_called_once_with("/tmp/nsd_test.sock")
+        mock_context.wrap_socket.assert_called_once_with(mock_sock, server_hostname="localhost")
+        self.assertEqual(client.sock, mock_ssl_sock)
 
 
 if __name__ == "__main__":

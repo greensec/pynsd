@@ -76,6 +76,9 @@ class ResponseParser:
     OK_COMMANDS: Tuple[str, ...] = (
         "addzone",
         "delzone",
+        "changezone",
+        "addzones",
+        "delzones",
         "reconfig",
         "log_reopen",
         "notify",
@@ -139,6 +142,8 @@ class ResponseParser:
             return cls._parse_transfer(data)
         elif cmd == "zonestatus":
             return cls._parse_zonestatus(data)
+        elif cmd == "serverpid":
+            return cls._parse_serverpid(data)
         elif cmd == "print_tsig":
             return cls._parse_tsig_info(data)
         elif cmd == "print_cookie_secrets":
@@ -203,6 +208,15 @@ class ResponseParser:
         is_ok = any(line == "ok" or line.startswith("ok,") for line in lines)
 
         return {"msg": lines, "success": is_ok}
+
+    @staticmethod
+    def _parse_serverpid(data: str) -> Dict[str, Any]:
+        """Parse the response from the 'serverpid' command."""
+        try:
+            pid = int(data.strip())
+            return {"success": True, "result": {"pid": pid}}
+        except ValueError:
+            return {"success": False, "msg": [data]}
 
     @classmethod
     def _parse_transfer(cls, data: str) -> Dict[str, Any]:

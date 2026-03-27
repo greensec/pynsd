@@ -1,10 +1,9 @@
 import logging
 import socket
 import ssl
-import enum
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
+
 
 from .exception import NSDCommandError, NSDConfigurationError, NSDConnectionError, NSDError, NSDTimeoutError
 
@@ -21,61 +20,6 @@ BUFSIZE = 8192
 
 # Default timeout for socket operations (seconds)
 DEFAULT_TIMEOUT = 30.0
-
-
-class NSDCommand(enum.Enum):
-    """Enumeration of all NSD control commands."""
-
-    # Server control commands
-    STOP = "stop"
-    RELOAD = "reload"
-    RECONFIG = "reconfig"
-    REPATTERN = "repattern"
-    LOG_REOPEN = "log_reopen"
-
-    # Zone management commands
-    ADD_ZONE = "addzone"
-    DEL_ZONE = "delzone"
-    CHANGE_ZONE = "changezone"
-    ADD_ZONES = "addzones"
-    DEL_ZONES = "delzones"
-    WRITE = "write"
-    NOTIFY = "notify"
-    TRANSFER = "transfer"
-    FORCE_TRANSFER = "force_transfer"
-    ZONE_STATUS = "zonestatus"
-
-    # Server information
-    STATUS = "status"
-    STATS = "stats"
-    STATS_NO_RESET = "stats_noreset"
-    SERVER_PID = "serverpid"
-
-    # TSIG key management
-    PRINT_TSIG = "print_tsig"
-    UPDATE_TSIG = "update_tsig"
-    ADD_TSIG = "add_tsig"
-    DEL_TSIG = "del_tsig"
-    ASSOC_TSIG = "assoc_tsig"
-
-    # Cookie secrets
-    ADD_COOKIE_SECRET = "add_cookie_secret"
-    DROP_COOKIE_SECRET = "drop_cookie_secret"
-    ACTIVATE_COOKIE_SECRET = "activate_cookie_secret"
-    PRINT_COOKIE_SECRETS = "print_cookie_secrets"
-
-    # Verbosity control
-    VERBOSITY = "verbosity"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-@dataclass
-class Request:
-    args: Tuple[Any, ...]
-    command: Optional[NSDCommand] = None
-    command_other: Optional[str] = None
 
 
 class Client:
@@ -110,8 +54,9 @@ class Client:
         client_cert: Union[str, Path],
         client_key: Union[str, Path],
         server_cert: Optional[Union[str, Path]] = None,
-        host: str = "127.0.0.1",
+        host: Optional[str] = "127.0.0.1",
         port: int = 8952,
+        unix_socket: Optional[Union[str, Path]] = None,
         bufsize: Optional[int] = None,
         timeout: Optional[float] = None,
         ssl_verify: bool = True,
@@ -129,20 +74,29 @@ class Client:
             ssl_verify: Whether to verify the server's SSL certificate. Set to False to disable
                       certificate verification (useful for self-signed certificates). Defaults to True.
         """
+
         self.client_cert = Path(client_cert)
         self.client_key = Path(client_key)
         self.server_cert = Path(server_cert) if server_cert else None
-        self.host = host
-        self.port = port
+
+        if unix_socket:
+            self.host = None
+            self.port = 0
+            self.unix_socket = Path(unix_socket)
+        else:
+            self.host = host
+            self.port = port
+            self.unix_socket = None
+
         self._bufsize = bufsize or BUFSIZE
         self.timeout = timeout or DEFAULT_TIMEOUT
         self.ssl_verify = ssl_verify
-        self.sock: Optional[ssl.SSLSocket] = None
+        self.sock: Optional[Union[ssl.SSLSocket, socket.socket]] = None
 
         # Validate certificate and key files
         self._validate_cert_files()
-
-        logger.debug("Initialized NSD client: %s:%d (cert: %s, key: %s, ca: %s)", self.host, self.port, self.client_cert, self.client_key, self.server_cert)
+        remote = self.unix_socket if self.unix_socket else f"{self.host}:{self.port}"
+        logger.debug("Initialized NSD client: %s (cert: %s, key: %s, ca: %s)", remote, self.client_cert, self.client_key, self.server_cert)
 
     def _validate_cert_files(self) -> None:
         """Validate that certificate and key files exist and are accessible.
@@ -151,6 +105,8 @@ class Client:
             NSDConfigurationError: If certificate or key files are invalid
         """
         try:
+            if self.unix_socket:
+                return
             if not self.client_cert.exists():
                 raise NSDConfigurationError(f"Certificate file not found: {self.client_cert}")
             if not self.client_key.exists():
@@ -217,7 +173,9 @@ class Client:
         sock = self.sock
         self.sock = None  # Clear reference first to prevent race conditions
 
-        logger.debug("Closing connection to %s:%d", self.host, self.port)
+        if self.host:
+            logger.debug("Closing connection to %s:%d", self.host, self.port)
+
         try:
             sock.shutdown(socket.SHUT_RDWR)
         except (OSError, socket.error) as e:
@@ -229,7 +187,7 @@ class Client:
             except OSError as e:
                 logger.debug("Error closing socket: %s", e)
 
-    def connect(self, host: Optional[str] = None, port: Optional[int] = None) -> None:
+    def connect(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket: Optional[Union[str, Path]] = None) -> None:
         """Connect to the NSD control port.
 
         If host or port are not provided, the values from initialization are used.
@@ -237,6 +195,7 @@ class Client:
         Args:
             host: Optional hostname or IP address of the NSD server
             port: Optional port number of the NSD control interface
+            unix_socket: Optional path to the Unix domain socket
 
         Raises:
             NSDConnectionError: If connection to the server fails
@@ -255,17 +214,29 @@ class Client:
         if port is not None:
             self.port = port
 
+        if unix_socket:
+            self.unix_socket = Path(unix_socket)
+
+        if self.unix_socket:
+            remote_host = self.unix_socket
+        else:
+            remote_host = f"{self.host}:{self.port}"
+
         if self.sock is not None:
-            logger.debug("Closing existing connection to %s:%d", self.host, self.port)
+            logger.debug("Closing existing connection to %s", remote_host)
             self.close()
 
-        logger.info("Connecting to NSD control at %s:%d", self.host, self.port)
+        logger.info("Connecting to NSD control at %s", remote_host)
 
         try:
             # Create SSL context
             context = ssl.create_default_context()
-            context.load_cert_chain(certfile=str(self.client_cert), keyfile=str(self.client_key))
 
+            # Load client certificate and key if available
+            if self.client_cert and self.client_key:
+                context.load_cert_chain(certfile=str(self.client_cert), keyfile=str(self.client_key))
+
+            # Configure server certificate verification
             if self.server_cert:
                 context.load_verify_locations(cafile=str(self.server_cert))
 
@@ -275,20 +246,24 @@ class Client:
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
 
-            # Configure timeouts
-            sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
-
-            # Wrap with SSL
-            self.sock = context.wrap_socket(sock, server_hostname=self.host, server_side=False)
-
-            # Set socket options
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            if self.unix_socket:
+                # Create Unix socket and wrap with SSL
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.settimeout(self.timeout)
+                sock.connect(str(self.unix_socket))
+                # Wrap with SSL - use empty string as server_hostname for Unix socket
+                self.sock = context.wrap_socket(sock, server_hostname="localhost")
+            else:
+                # For TCP, create connection and wrap with SSL
+                sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+                self.sock = context.wrap_socket(sock, server_hostname=self.host)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             self.sock.settimeout(self.timeout)
 
-            logger.debug("Successfully connected to %s:%d", self.host, self.port)
+            logger.debug("Successfully connected to %s", remote_host)
 
         except socket.timeout as e:
-            error_msg = f"Connection to {self.host}:{self.port} timed out after {self.timeout}s"
+            error_msg = f"Connection to {remote_host} timed out after {self.timeout}s"
             logger.error(error_msg)
             raise NSDTimeoutError(error_msg) from e
 
@@ -298,7 +273,7 @@ class Client:
             raise NSDConnectionError(error_msg) from e
 
         except ConnectionRefusedError as e:
-            error_msg = f"Connection refused by {self.host}:{self.port} - is NSD running?"
+            error_msg = f"Connection refused by {remote_host} - is NSD running?"
             logger.error(error_msg)
             raise NSDConnectionError(error_msg) from e
 
@@ -308,7 +283,7 @@ class Client:
             raise
 
         except OSError as e:
-            error_msg = f"Failed to connect to {self.host}:{self.port}: {e}"
+            error_msg = f"Failed to connect to {remote_host}: {e}"
             logger.error(error_msg)
             raise NSDConnectionError(error_msg) from e
 
@@ -316,7 +291,7 @@ class Client:
         """Make NSD control commands callable as methods.
 
         This allows calling control commands as methods on the ControlClient instance,
-        e.g., client.zone_status('example.com')
+        e.g., client.zonestatus('example.com')
 
         Args:
             name: Name of the NSD control command
@@ -423,7 +398,8 @@ class Client:
 
             # Combine all received data
             response = b"".join(buffer)
-            logger.debug("Received %d bytes from %s:%d", len(response), self.host, self.port)
+            remote = self.unix_socket if self.unix_socket else f"{self.host}:{self.port}"
+            logger.debug("Received %d bytes from %s", len(response), remote)
 
             # Decode to string with error handling
             try:
