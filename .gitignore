@@ -50,3 +50,8 @@ __pycache__
 /.pytest_cache
 /.vscode
 /.venv
+
+# Integration test runtime artifacts (TLS keys, state, dynamic zones)
+/tests/integration/runtime/certs/*
+/tests/integration/runtime/state/*
+/tests/integration/runtime/zones/dynamic/*

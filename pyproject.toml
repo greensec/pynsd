@@ -6,11 +6,11 @@ build-backend = "setuptools.build_meta:__legacy__"
 name = "pynsd"
 description = "Library to connect and call command against new NSD >=4 control api."
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.7"
 authors = [
     { name = "greenSec GmbH", email = "meinecke@greensec.de" }
 ]
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
 keywords = ["nsd", "api"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -38,7 +38,7 @@ version = {file = ["src/pynsd/VERSION"]}
 
 [dependency-groups]
 dev = [
-    "pyright>=0.0.13.post0",
+    "pyright>=1.1.408",
     "pytest>=7.0.1",
     "ruff>=0.0.17",
     "vulture>=2.8",
@@ -66,6 +66,12 @@ addopts = [
     "--import-mode=importlib",
 ]
 pythonpath = ["."]
+markers = [
+    "integration: mark tests that require a live NSD container",
+]
+norecursedirs = [
+    "tests/integration/runtime",
+]
 
 [tool.pyright]
 exclude = ["**/__pycache__", "**/node_modules", "**/dist", "**/build", "**/venv", "**/.venv", "**/docs"]

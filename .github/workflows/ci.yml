@@ -67,3 +67,79 @@ jobs:
         run: |
           source .venv/bin/activate
           make test
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Primes
+        id: cache-primes
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.cache/pip
+          key: uv-cache-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            uv-cache-
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install uv
+          uv sync
+
+      - name: Create integration runtime directories
+        run: |
+          mkdir -p tests/integration/runtime/certs
+          mkdir -p tests/integration/runtime/state
+          mkdir -p tests/integration/runtime/zones/dynamic
+
+      - name: Build and start NSD integration stack
+        run: docker compose -f docker-compose.integration.yml up -d --build
+
+      - name: Validate NSD config in container
+        run: docker compose -f docker-compose.integration.yml exec -T nsd nsd-checkconf /etc/nsd/nsd.conf
+
+      - name: Wait for NSD control readiness
+        run: |
+          set -eu
+          for i in $(seq 1 60); do
+            if docker compose -f docker-compose.integration.yml exec -T nsd nsd-control -c /etc/nsd/nsd.conf status >/tmp/nsd-status.log 2>&1; then
+              cat /tmp/nsd-status.log
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "NSD readiness check timed out"
+          cat /tmp/nsd-status.log || true
+          exit 1
+
+      - name: Run integration tests
+        run: |
+          source .venv/bin/activate
+          pytest -m integration tests/test_integration.py -v
+
+      - name: Print Docker compose logs
+        if: always()
+        run: docker compose -f docker-compose.integration.yml logs
+
+      - name: Print integration runtime tree
+        if: always()
+        run: |
+          echo "Runtime tree:"
+          find tests/integration/runtime -maxdepth 4 -print || true
+          echo "zone.list:"
+          cat tests/integration/runtime/state/zone.list || true
+
+      - name: Tear down integration stack
+        if: always()
+        run: docker compose -f docker-compose.integration.yml down -v

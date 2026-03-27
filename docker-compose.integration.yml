@@ -1,0 +1,11 @@
+services:
+  nsd:
+    build:
+      context: .
+      dockerfile: docker/nsd/Dockerfile
+    ports:
+      - "${NSD_CONTROL_PORT:-8952}:8952"
+    volumes:
+      - ./tests/integration/nsd.conf:/etc/nsd/nsd.conf:ro
+      - ./tests/integration/zones/static:/zones/static:ro
+      - ./tests/integration/runtime:/runtime

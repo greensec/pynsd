@@ -256,11 +256,15 @@ class ResponseParser:
 
         for line in data.split("\n"):
             line = line.strip()
-            if not line:
+            if not line or line == "ok":
                 continue
 
+            if line.startswith("zone:"):
+                _, zone_name = line.split(":", 1)
+                current_zone = zone_name.strip()
+                result["result"][current_zone] = {}
             # New zone section starts with zone name
-            if ":" not in line and "=" not in line and not line.startswith("["):
+            elif ":" not in line and "=" not in line and not line.startswith("["):
                 current_zone = line.strip()
                 result["result"][current_zone] = {}
             elif current_zone and ":" in line:

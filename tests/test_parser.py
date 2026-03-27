@@ -146,6 +146,7 @@ class TestResponseParserTransfer(unittest.TestCase):
 
 class TestResponseParserZoneStatus(unittest.TestCase):
     STATUS_DATA = "example.com\n\tstate: ok\n\tserved-serial: 2021061901\n\tnotified-serial: 2021061901\n"
+    STATUS_DATA_V4 = "zone:\texample.com\n\tstate: master\nok\n"
 
     def test_parse_zonestatus_success(self):
         result = ResponseParser.parse("zonestatus", self.STATUS_DATA)
@@ -168,6 +169,14 @@ class TestResponseParserZoneStatus(unittest.TestCase):
         self.assertIn("example.com", zones)
         self.assertIn("test.org", zones)
         self.assertEqual(zones["test.org"]["state"], "refreshing")
+
+    def test_parse_zonestatus_with_zone_prefix_format(self):
+        result = ResponseParser.parse("zonestatus", self.STATUS_DATA_V4)
+        self.assertTrue(result.is_success())
+        zones = result.data
+        assert isinstance(zones, dict)
+        self.assertIn("example.com", zones)
+        self.assertEqual(zones["example.com"]["state"], "master")
 
 
 class TestResponseParserServerPid(unittest.TestCase):
