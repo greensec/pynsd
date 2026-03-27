@@ -206,7 +206,7 @@ class Client:
         Example:
             ```python
             client = pynsd.Client('client.crt', 'client.key')
-            client.connect('nsd.example.com', 8953)
+            client.connect('nsd.example.com', 8952)
             ```
         """
         if host is not None:

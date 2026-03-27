@@ -29,12 +29,12 @@ pip install pynsd
 ```python
 import pynsd
 
-# Basic connection with default settings (localhost:8953)
+# Basic connection with default settings (localhost:8952)
 with pynsd.Client(
     client_cert='/etc/nsd/nsd_control.pem',
     client_key='/etc/nsd/nsd_control.key',
     host='127.0.0.1',
-    port=8953
+    port=8952
 ) as client:
     # ...
 
@@ -43,7 +43,7 @@ with pynsd.Client(
     client_cert='/etc/nsd/nsd_control.pem',
     client_key='/etc/nsd/nsd_control.key',
     host='nsd.example.com',
-    port=8953,
+    port=8952,
     ssl_verify=False  # Disable SSL certificate verification
 ) as client:
     # Get server status
