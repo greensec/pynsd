@@ -231,6 +231,7 @@ class Client:
         try:
             # Create SSL context
             context = ssl.create_default_context()
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
 
             # Load client certificate and key if available
             if self.client_cert and self.client_key:
